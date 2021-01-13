@@ -409,10 +409,11 @@ function assert_memory_settings_specified_manually {
 function calculate_memory_settings_automatically {
   local readonly services="$1"
 
-  log_info "Calculating memory settings automatically..."
+  log_info "Calculating memory settings automatically for services [$services]"
 
   local total_memory_mb
   total_memory_mb=$(os_get_available_memory_mb)
+  log_info "- Total memory: $total_memory_mb"
 
   # It took some digging through the Couchbase source code, but the maximum quota they will allow you to use is 80% of
   # the total available memory on the server. In practice, it seems like 65% is a safer target, so we should divide
@@ -420,12 +421,14 @@ function calculate_memory_settings_automatically {
   # https://github.com/couchbase/ns_server/blob/bc1460747b634ac85af8dd118857d1f494256cc5/src/memory_quota.erl#L78-L84
   # https://github.com/couchbase/ns_server/blob/7cdac3af08ce0d8640e9066d268026f4de32a580/include/ns_common.hrl#L206
   local readonly available_memory=$(($total_memory_mb * 65 / 100))
+  log_info "- Available memory: $available_memory"
 
   local data_ramsize=0
   local index_ramsize=0
   local fts_ramsize=0
 
   if string_contains "$services" "data" && string_contains "$services" "index" && string_contains "$services" "fts"; then
+    log_info "-- Set memory for data,index,fts"
     data_ramsize=$(($available_memory * 50 / 100))
     index_ramsize=$(($available_memory * 25 / 100))
     fts_ramsize=$(($available_memory * 25 / 100))
@@ -436,6 +439,7 @@ function calculate_memory_settings_automatically {
     data_ramsize=$(($available_memory * 65 / 100))
     fts_ramsize=$(($available_memory * 35 / 100))
   elif string_contains "$services" "index" && string_contains "$services" "fts"; then
+    log_info "-- Set memory for index,fts"
     index_ramsize=$(($available_memory * 50 / 100))
     fts_ramsize=$(($available_memory * 50 / 100))
   elif string_contains "$services" "data"; then
@@ -457,6 +461,9 @@ function calculate_memory_settings_automatically {
   if [[ "$fts_ramsize" -gt 0 && "$fts_ramsize" -lt 256 ]]; then
     fts_ramsize=256
   fi
+  log_info "-- data_ramsize:  $data_ramsize"
+  log_info "-- index_ramsize: $index_ramsize"
+  log_info "-- fts_ramsize:   $fts_ramsize"
 
   # This is a hacky way to return multiple values from Bash that happens to work because our values contain no spaces
   # https://stackoverflow.com/a/39063403/483528
